@@ -46,6 +46,11 @@ app.post('/korrigiere', async (req, res) => {
     }
 });
 
-app.listen(port, () => {
-    console.log(`Server läuft auf http://localhost:${port}`);
-});
+// Lokal wird der Server gestartet; auf Vercel wird die App als Serverless-Function importiert.
+if (require.main === module) {
+    app.listen(port, () => {
+        console.log(`Server läuft auf http://localhost:${port}`);
+    });
+}
+
+module.exports = app;
