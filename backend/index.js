@@ -24,7 +24,7 @@ app.post('/korrigiere', async (req, res) => {
             messages: [
                 {
                     role: 'system',
-                    content: 'Du bist ein technischer Redakteur. Korrigiere den gegebenen Text grammatikalisch und formuliere ihn in einer sachlich-technischen Sprache um.',
+                    content: 'Du bist ein technischer Redakteur. Korrigiere den gegebenen Text grammatikalisch und formuliere ihn in einer sachlich-technischen Sprache um. Behalte dabei zwingend die Sprache des Eingabetextes bei: Antworte auf Deutsch, wenn die Eingabe auf Deutsch ist, und auf Englisch, wenn die Eingabe auf Englisch ist. Übersetze den Text niemals in eine andere Sprache.',
                 },
                 {
                     role: 'user',
