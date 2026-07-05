@@ -5,6 +5,9 @@ const { OpenAI } = require('openai');
 const app = express();
 const port = 3000;
 
+// Verrät nach außen nicht, dass Express verwendet wird.
+app.disable('x-powered-by');
+
 app.use(express.json());
 
 const openai = new OpenAI({
@@ -44,6 +47,12 @@ app.post('/korrigiere', async (req, res) => {
         console.error('Fehler bei der Anfrage an OpenAI:', error.message);
         res.status(500).json({ error: 'Fehler beim Verarbeiten des Textes.' });
     }
+});
+
+// Neutrale Antwort für alle übrigen Pfade (inkl. Root), damit von außen
+// nichts über die Funktionsweise des Backends sichtbar ist.
+app.use((req, res) => {
+    res.status(404).send('Not found');
 });
 
 // Lokal wird der Server gestartet; auf Vercel wird die App als Serverless-Function importiert.
