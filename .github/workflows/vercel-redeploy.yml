@@ -1,10 +1,10 @@
-# Vercel baut nur Commits, deren Autor Zugriff auf das Vercel-Projekt hat. Pushes anderer
-# GitHub-Konten (z. B. wizard-exe) werden ignoriert. Dieser Workflow hängt deshalb einen leeren
-# chore-Commit als krugundschram an, der das Deployment auslöst.
+# Vercel baut über die GitHub-Integration nur Commits, deren Autor Zugriff auf das Vercel-Projekt
+# hat; Pushes anderer Konten werden ignoriert. Dieser Workflow stößt deshalb nach jedem Push auf den
+# Hauptbranch einen Vercel Deploy Hook an, der unabhängig vom Commit-Autor deployt.
 #
 # Vorlage aus ks-overview/templates/vercel-redeploy.yml; Einrichtung über scripts/setup-vercel-redeploy.sh.
-# Benötigtes Secret: DEPLOY_PAT, ein Personal Access Token des Kontos krugundschram mit
-# "contents: write" auf diesem Repository.
+# Benötigtes Secret: VERCEL_DEPLOY_HOOK_URL (Vercel → Projekt → Settings → Git → Deploy Hooks,
+# Branch = Hauptbranch).
 name: Vercel redeploy
 
 on:
@@ -14,18 +14,14 @@ on:
 
 jobs:
   redeploy:
-    # Überspringen, wenn krugundschram selbst gepusht hat (verhindert auch die Schleife,
-    # weil der Push unten als krugundschram erfolgt).
-    if: github.actor != 'krugundschram'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.DEPLOY_PAT }}
-
-      - name: Leeren chore-Commit als krugundschram pushen
+      - name: Vercel Deploy Hook aufrufen
+        env:
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
         run: |
-          git config user.name "krugundschram"
-          git config user.email "hosting@krugundschram.de"
-          git commit --allow-empty -m "chore: trigger Vercel deploy for ${{ github.sha }}"
-          git push origin "HEAD:${{ github.ref_name }}"
+          if [ -z "$VERCEL_DEPLOY_HOOK_URL" ]; then
+            echo "::error::Secret VERCEL_DEPLOY_HOOK_URL fehlt (Vercel → Settings → Git → Deploy Hooks)"
+            exit 1
+          fi
+          curl --fail --silent --show-error -X POST "$VERCEL_DEPLOY_HOOK_URL"
