@@ -5,6 +5,11 @@ name: Vercel redeploy
 # jemand anderem, pusht dieser Workflow einen leeren Chore-Commit im Namen von
 # krugundschram, damit Vercel baut. Pushes mit GITHUB_TOKEN lösen keine weiteren
 # Workflow-Läufe aus, es entsteht also keine Schleife.
+#
+# Übergang: Solange die Vercel-GitHub-App nicht mit der Organisation verbunden ist,
+# baut Vercel auch den Chore-Commit nicht. Ist das Secret VERCEL_TOKEN gesetzt,
+# deployt der Workflow deshalb zusätzlich per Vercel CLI vom Chore-Commit aus.
+# Nach dem Verbinden der App das Secret löschen, sonst wird doppelt deployt.
 on:
   push:
     branches: [main, master]
@@ -16,15 +21,26 @@ permissions:
 jobs:
   repush:
     runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
       - name: Leeren Chore-Commit als Vercel-Kontoinhaber pushen
         run: |
           if [ "$(git log -1 --format=%ae)" = "hosting@krugundschram.de" ]; then
-            echo "Letzter Commit stammt schon von krugundschram, nichts zu tun."
+            echo "Letzter Commit stammt schon von krugundschram, nichts zu pushen."
             exit 0
           fi
           git config user.name "krugundschram"
           git config user.email "hosting@krugundschram.de"
           git commit --allow-empty -m "chore: trigger Vercel deploy for ${GITHUB_SHA::7}"
           git push
+      - name: Per Vercel CLI deployen (Übergang, solange die GitHub-App nicht verbunden ist)
+        if: env.VERCEL_TOKEN != ''
+        run: |
+          for v in VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            [ -n "${!v}" ] || { echo "::error::Variable $v fehlt (scripts/setup-vercel-redeploy.sh)"; exit 1; }
+          done
+          timeout 15m npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN" </dev/null
