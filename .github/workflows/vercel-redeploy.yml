@@ -27,6 +27,8 @@ jobs:
       VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # Tags und Historie für Build-Skripte (z. B. Versionierung im Dashboard)
       - name: Leeren Chore-Commit als Vercel-Kontoinhaber pushen
         run: |
           if [ "$(git log -1 --format=%ae)" = "hosting@krugundschram.de" ]; then
@@ -37,10 +39,23 @@ jobs:
           git config user.email "hosting@krugundschram.de"
           git commit --allow-empty -m "chore: trigger Vercel deploy for ${GITHUB_SHA::7}"
           git push
+      - uses: actions/setup-node@v4
+        if: env.VERCEL_TOKEN != '' && vars.VERCEL_PREBUILT == 'true'
+        with:
+          node-version: 22
       - name: Per Vercel CLI deployen (Übergang, solange die GitHub-App nicht verbunden ist)
         if: env.VERCEL_TOKEN != ''
+        env:
+          VERCEL_PREBUILT: ${{ vars.VERCEL_PREBUILT }}
         run: |
           for v in VERCEL_ORG_ID VERCEL_PROJECT_ID; do
             [ -n "${!v}" ] || { echo "::error::Variable $v fehlt (scripts/setup-vercel-redeploy.sh)"; exit 1; }
           done
-          timeout 15m npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN" </dev/null
+          if [ "$VERCEL_PREBUILT" = "true" ]; then
+            # Build hier in Actions, damit Build-Skripte Git sehen; Vercel bekommt nur das Ergebnis.
+            npx --yes vercel@latest pull --yes --environment=production --token "$VERCEL_TOKEN"
+            npx --yes vercel@latest build --prod --token "$VERCEL_TOKEN"
+            timeout 15m npx --yes vercel@latest deploy --prebuilt --prod --yes --token "$VERCEL_TOKEN" </dev/null
+          else
+            timeout 15m npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN" </dev/null
+          fi
