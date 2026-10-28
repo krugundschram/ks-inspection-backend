@@ -1,0 +1,24 @@
+# Mergt jeden Pull Request automatisch per Squash, sobald er mergebar ist.
+# Vorlage aus ks-overview/templates/auto-merge.yml; Einrichtung über scripts/setup-pr-automerge.sh.
+# Draft-PRs werden nicht gemergt. Mit DEPLOY_PAT (statt GITHUB_TOKEN) lösen die Merges
+# nachgelagerte Push-Workflows (z. B. Deployments) aus.
+name: Auto-merge
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto-Merge aktivieren oder sofort mergen
+        env:
+          GH_TOKEN: ${{ secrets.DEPLOY_PAT || secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR_URL" || gh pr merge --squash "$PR_URL"
