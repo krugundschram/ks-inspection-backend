@@ -16,12 +16,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: gh pr merge --auto --squash "$PR_URL" || gh pr merge --squash "$PR_URL"
-      - name: Vercel-Deploy anstoßen (falls Workflow vorhanden)
+      - name: Vercel-Redeploy anstoßen (falls Workflow vorhanden)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           BASE: ${{ github.event.pull_request.base.ref }}
         run: |
-          gh workflow list --json name --jq '.[].name' | grep -qx 'Vercel deploy' || exit 0
+          gh workflow list --json name --jq '.[].name' | grep -qx 'Vercel redeploy' || exit 0
           [ "$(gh pr view "$PR_URL" --json state --jq .state)" = "MERGED" ] || exit 0
-          gh workflow run vercel-deploy.yml --ref "$BASE"
+          gh workflow run vercel-redeploy.yml --ref "$BASE"
