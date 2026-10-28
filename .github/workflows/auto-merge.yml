@@ -1,7 +1,8 @@
 # Mergt jeden Pull Request automatisch per Squash, sobald er mergebar ist.
 # Vorlage aus ks-overview/templates/auto-merge.yml; Einrichtung über scripts/setup-pr-automerge.sh.
-# Draft-PRs werden nicht gemergt. Mit DEPLOY_PAT (statt GITHUB_TOKEN) lösen die Merges
-# nachgelagerte Push-Workflows (z. B. Deployments) aus.
+# Draft-PRs werden nicht gemergt. Merges mit dem Actions-Token lösen keine weiteren Workflows aus,
+# deshalb ruft dieser Workflow nach dem Merge selbst den Vercel Deploy Hook auf, falls das Secret
+# VERCEL_DEPLOY_HOOK_URL existiert.
 name: Auto-merge
 
 on:
@@ -19,6 +20,16 @@ jobs:
     steps:
       - name: Auto-Merge aktivieren oder sofort mergen
         env:
-          GH_TOKEN: ${{ secrets.DEPLOY_PAT || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: gh pr merge --auto --squash "$PR_URL" || gh pr merge --squash "$PR_URL"
+
+      - name: Vercel Deploy Hook aufrufen (falls vorhanden)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          [ -n "$VERCEL_DEPLOY_HOOK_URL" ] || exit 0
+          [ "$(gh pr view "$PR_URL" --json state --jq .state)" = "MERGED" ] || exit 0
+          curl --fail --silent --show-error -X POST "$VERCEL_DEPLOY_HOOK_URL"
