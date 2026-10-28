@@ -1,0 +1,30 @@
+name: Vercel redeploy
+
+# Vercel (Hobby) baut nur Commits, deren Autor der Inhaber des Vercel-Kontos ist
+# (GitHub-Konto krugundschram). Stammt der letzte Commit auf dem Hauptbranch von
+# jemand anderem, pusht dieser Workflow einen leeren Chore-Commit im Namen von
+# krugundschram, damit Vercel baut. Pushes mit GITHUB_TOKEN lösen keine weiteren
+# Workflow-Läufe aus, es entsteht also keine Schleife.
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repush:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Leeren Chore-Commit als Vercel-Kontoinhaber pushen
+        run: |
+          if [ "$(git log -1 --format=%ae)" = "hosting@krugundschram.de" ]; then
+            echo "Letzter Commit stammt schon von krugundschram, nichts zu tun."
+            exit 0
+          fi
+          git config user.name "krugundschram"
+          git config user.email "hosting@krugundschram.de"
+          git commit --allow-empty -m "chore: trigger Vercel deploy for ${GITHUB_SHA::7}"
+          git push
