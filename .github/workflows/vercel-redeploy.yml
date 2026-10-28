@@ -1,0 +1,31 @@
+# Vercel baut nur Commits, deren Autor Zugriff auf das Vercel-Projekt hat. Pushes anderer
+# GitHub-Konten (z. B. wizard-exe) werden ignoriert. Dieser Workflow hängt deshalb einen leeren
+# chore-Commit als krugundschram an, der das Deployment auslöst.
+#
+# Vorlage aus ks-overview/templates/vercel-redeploy.yml; Einrichtung über scripts/setup-vercel-redeploy.sh.
+# Benötigtes Secret: DEPLOY_PAT, ein Personal Access Token des Kontos krugundschram mit
+# "contents: write" auf diesem Repository.
+name: Vercel redeploy
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  redeploy:
+    # Überspringen, wenn krugundschram selbst gepusht hat (verhindert auch die Schleife,
+    # weil der Push unten als krugundschram erfolgt).
+    if: github.actor != 'krugundschram'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.DEPLOY_PAT }}
+
+      - name: Leeren chore-Commit als krugundschram pushen
+        run: |
+          git config user.name "krugundschram"
+          git config user.email "hosting@krugundschram.de"
+          git commit --allow-empty -m "chore: trigger Vercel deploy for ${{ github.sha }}"
+          git push origin "HEAD:${{ github.ref_name }}"
