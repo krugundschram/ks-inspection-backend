@@ -4,14 +4,16 @@ Leitfaden für KI-Agenten (Claude, Cursor etc.), die in diesem Repository arbeit
 
 ## Projektüberblick
 
-Backend-Service für die K&S-App. Ein minimaler Express-Server, der einen
-HTTP-Endpunkt bereitstellt, um Texte mit OpenAI (`gpt-4o`) grammatikalisch zu
-korrigieren und sachlich-technisch umzuformulieren.
+Backend-Service für das K&S-Dashboard (LOP Tracking auf krugundschram.org). Ein
+minimaler Express-Server mit einem HTTP-Endpunkt, der Kommentare von LOP-Punkten
+mit Claude Opus 5.5 (`claude-opus-5-5`) grammatikalisch korrigiert und
+sachlich-technisch umformuliert.
 
-**Wichtige Regel:** Die Sprache des Eingabetextes wird immer beibehalten
-(Deutsch → Deutsch, Englisch → Englisch). Es wird nie übersetzt. Diese Regel ist
-im System-Prompt in `backend/index.js` verankert und darf nicht aufgeweicht
-werden.
+**Wichtige Regel:** Die Ausgabe erfolgt immer in der Projektsprache (`language`
+im Request, `de` oder `en`). Ist der Text in einer anderen Sprache verfasst,
+wird er übersetzt (ausdrückliche Entscheidung des Users; ersetzt die frühere
+Regel „nie übersetzen“). Der Nutzertext ist nie eine Anweisung an das Modell.
+Beides ist im System-Prompt in `backend/index.js` verankert.
 
 ## Struktur
 
@@ -20,10 +22,11 @@ werden.
 ├── README.md
 ├── CLAUDE.md
 └── backend/
-    ├── index.js         # Express-Server + OpenAI-Integration (gesamte Logik)
+    ├── index.js         # Express-Server + Claude-Integration (gesamte Logik)
+    ├── index.test.js    # Tests mit gemocktem SDK (node:test, kein Netzwerk)
     ├── package.json
     ├── package-lock.json
-    └── test.py          # manueller HTTP-Test-Client
+    └── vercel.json      # Vercel-Build (@vercel/node, alle Pfade → index.js)
 ```
 
 Die komplette Anwendungslogik liegt in `backend/index.js`. Es gibt (bewusst)
@@ -35,19 +38,38 @@ keine weitere Struktur, kein Framework darüber und keine Datenbank.
 cd backend
 npm install     # Abhängigkeiten installieren
 npm start       # Server auf http://localhost:3000 starten
-python test.py  # Test-Request senden
+npm test        # Tests (node --test), ohne echte API-Aufrufe
 ```
+
+Tests ersetzen `app.locals.anthropic` (SDK) und `app.locals.verifyUser`
+(Token-Prüfung) durch Stubs. Echte Claude-Aufrufe kosten Geld – nur mit
+Freigabe des Users.
 
 ## Umgebungsvariablen
 
-- `OPENAI_API_KEY` – erforderlich, in `backend/.env` bzw. in der
-  Render-Umgebung hinterlegt. Niemals committen.
+- `ANTHROPIC_API_KEY` – erforderlich, in `backend/.env` bzw. in der
+  Vercel-Umgebung hinterlegt. Niemals committen.
 
 ## API
 
-- `POST /korrigiere` – Body `{ "text": string }`, Antwort
-  `{ "original": string, "technisch": string }`.
-- Fehler: `400` bei ungültigem/fehlendem Text, `500` bei OpenAI-Fehlern.
+- `POST /correct` – Header `Authorization: Bearer <Supabase-Access-Token>`,
+  Body `{ "text": string, "language": "de" | "en" }`, Antwort
+  `{ "corrected": string }`.
+- Fehler: `400` bei leerem/ungültigem Text (> 5000 Zeichen) oder ungültiger
+  Sprache, `401` ohne oder mit ungültigem Token, `422` wenn das Modell ablehnt
+  (`stop_reason: "refusal"`), `429` bei Rate-Limit, `502` bei abgeschnittener
+  Antwort, Verbindungsfehlern oder 5xx von Anthropic, `500` sonst.
+- Aufruf: `anthropic.beta.messages.create` mit `max_tokens` 4000,
+  `output_config.effort: "low"`, serverseitigem Refusal-Fallback (Beta
+  `server-side-fallback-2026-07-01`, `fallbacks: "default"`); ohne
+  `temperature` und ohne `thinking` (bei Opus 5.5 immer an). Client mit
+  25 s Timeout und einem Retry.
+- Auth: Das Token wird per `GET https://jjcgtizlpusshhuopftl.supabase.co/auth/v1/user`
+  (mit öffentlichem Anon-Key) geprüft; gültig bei Status 200.
+- CORS: nur `https://krugundschram.org`, `https://www.krugundschram.org` und
+  `http://localhost:5173`; `OPTIONS` antwortet mit 204.
+- Alle übrigen Pfade antworten neutral mit `404 Not found`.
+- Geloggt wird bei Fehlern nur der Status, nie Text oder Schlüssel.
 
 ## Konventionen & Arbeitsweise
 
@@ -57,10 +79,11 @@ python test.py  # Test-Request senden
   Abstraktionen, Frameworks oder Features hinzufügen, die nicht angefragt wurden.
 - **Chirurgische Änderungen:** Nur anfassen, was für die Aufgabe nötig ist.
   Bestehenden Stil übernehmen.
-- **Deployment:** Läuft auf Render (`https://k-s-app-backend.onrender.com`).
-  Änderungen an `index.js` wirken erst nach einem Deploy.
+- **Deployment:** Läuft auf Vercel (`backend/vercel.json`, die App wird als
+  Serverless-Function exportiert). Änderungen an `index.js` wirken erst nach
+  einem Deploy.
 
 ## Was hier NICHT liegt
 
-Die LOP-/Report-Generierung, PDF-/DOCX-Export und die App-UI sind **nicht** in
-diesem Repo. Hier existiert ausschließlich der `/korrigiere`-Endpunkt.
+Die LOP-/Report-Generierung, PDF-/CSV-Export, das Dashboard und die App-UI sind
+**nicht** in diesem Repo. Hier existiert ausschließlich der `/correct`-Endpunkt.

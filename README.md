@@ -1,20 +1,21 @@
 # K-S-App-Backend
 
-Backend-Service für die K&S-App. Stellt einen HTTP-Endpunkt bereit, der Texte
-mithilfe von OpenAI (`gpt-4o`) grammatikalisch korrigiert und in eine
-sachlich-technische Sprache umformuliert. Die Sprache des Eingabetextes wird
-dabei beibehalten (Deutsch bleibt Deutsch, Englisch bleibt Englisch).
+Backend-Service für das K&S-Dashboard (LOP Tracking). Stellt einen
+HTTP-Endpunkt bereit, der Kommentare mithilfe von Claude Opus 5.5
+(`claude-opus-5-5`) grammatikalisch korrigiert und in eine sachlich-technische
+Sprache umformuliert. Die Ausgabe erfolgt immer in der Projektsprache (Deutsch
+oder Englisch); Texte in einer anderen Sprache werden dabei übersetzt.
 
 ## Tech-Stack
 
 - [Node.js](https://nodejs.org/) + [Express](https://expressjs.com/) `^5.1.0`
-- [OpenAI Node SDK](https://www.npmjs.com/package/openai) `^4.92.0`
+- [Anthropic TypeScript/JavaScript SDK](https://www.npmjs.com/package/@anthropic-ai/sdk) `^1.10.0`
 - [dotenv](https://www.npmjs.com/package/dotenv) `^16.4.7`
 
 ## Voraussetzungen
 
 - Node.js (empfohlen: LTS)
-- Ein OpenAI-API-Schlüssel
+- Ein Anthropic-API-Schlüssel
 
 ## Setup
 
@@ -26,7 +27,7 @@ npm install
 Lege im Ordner `backend/` eine `.env`-Datei an:
 
 ```env
-OPENAI_API_KEY=dein_openai_api_key
+ANTHROPIC_API_KEY=dein_anthropic_api_key
 ```
 
 ## Starten
@@ -40,53 +41,63 @@ Der Server läuft anschließend auf `http://localhost:3000`.
 
 ## API
 
-### `POST /korrigiere`
+### `POST /correct`
 
-Korrigiert und formuliert einen Text um. Die Antwortsprache entspricht immer der
-Sprache des Eingabetextes.
+Korrigiert und formuliert einen Text um. Die Antwort ist immer in der
+übergebenen Projektsprache.
+
+Erfordert ein gültiges Supabase-Access-Token des Dashboards im Header
+`Authorization: Bearer <token>`; das Backend prüft es bei Supabase
+(`GET /auth/v1/user`). Browser-Aufrufe sind per CORS nur von
+`https://krugundschram.org`, `https://www.krugundschram.org` und
+`http://localhost:5173` erlaubt.
 
 **Request-Body (JSON):**
 
-| Feld   | Typ      | Beschreibung              |
-| ------ | -------- | ------------------------- |
-| `text` | `string` | Der zu korrigierende Text |
+| Feld       | Typ              | Beschreibung                                  |
+| ---------- | ---------------- | --------------------------------------------- |
+| `text`     | `string`         | Der zu korrigierende Text (max. 5000 Zeichen) |
+| `language` | `"de"` \| `"en"` | Projektsprache, in der die Ausgabe erfolgt    |
 
 **Beispiel-Request:**
 
 ```bash
-curl -X POST http://localhost:3000/korrigiere \
+curl -X POST http://localhost:3000/correct \
+  -H "Authorization: Bearer <supabase-access-token>" \
   -H "Content-Type: application/json" \
-  -d '{"text": "Das ist so ein Ding, das man einfach so machen kann."}'
+  -d '{"text": "wechselrichter 3 geht nicht, display schwarz", "language": "de"}'
 ```
 
 **Beispiel-Antwort (200):**
 
 ```json
 {
-  "original": "Das ist so ein Ding, das man einfach so machen kann.",
-  "technisch": "..."
+  "corrected": "..."
 }
 ```
 
-**Fehlerantworten:**
+**Fehlerantworten** (Body jeweils `{ "error": "<Meldung>" }`):
 
-| Status | Bedingung                          | Body                                            |
-| ------ | ---------------------------------- | ----------------------------------------------- |
-| `400`  | `text` fehlt oder ist kein String  | `{ "error": "Kein gültiger Text übergeben." }`  |
-| `500`  | Fehler bei der Anfrage an OpenAI   | `{ "error": "Fehler beim Verarbeiten des Textes." }` |
+| Status | Bedingung                                                          |
+| ------ | ------------------------------------------------------------------ |
+| `400`  | `text` leer, kein String oder zu lang; `language` nicht `de`/`en`  |
+| `401`  | Token fehlt oder ist ungültig                                      |
+| `422`  | Das Modell hat die Anfrage abgelehnt                               |
+| `429`  | Rate-Limit bei Anthropic                                           |
+| `502`  | Antwort abgeschnitten, Anthropic nicht erreichbar oder 5xx         |
+| `500`  | Sonstiger Fehler beim Verarbeiten                                  |
 
 ## Test
 
-Ein einfacher Test-Client liegt unter `backend/test.py` und richtet sich
-standardmäßig gegen das Deployment auf Render:
-
 ```bash
-python backend/test.py
+cd backend
+npm test
 ```
+
+Die Tests (`backend/index.test.js`, `node:test`) ersetzen das Anthropic-SDK und
+die Token-Prüfung durch Stubs und machen keine echten API-Aufrufe.
 
 ## Deployment
 
-Der Service ist auf [Render](https://render.com/) deployt:
-`https://k-s-app-backend.onrender.com`
-
-Der `OPENAI_API_KEY` muss dort als Environment-Variable hinterlegt sein.
+Der Service ist auf [Vercel](https://vercel.com/) deployt (`backend/vercel.json`).
+Der `ANTHROPIC_API_KEY` muss dort als Environment-Variable hinterlegt sein.
