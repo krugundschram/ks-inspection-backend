@@ -58,12 +58,12 @@ Freigabe des Users.
 - Fehler: `400` bei leerem/ungültigem Text (> 5000 Zeichen) oder ungültiger
   Sprache, `401` ohne oder mit ungültigem Token, `422` wenn das Modell ablehnt
   (`stop_reason: "refusal"`), `429` bei Rate-Limit, `502` bei abgeschnittener
-  Antwort, Verbindungsfehlern oder 5xx von Anthropic, `500` sonst.
+  oder leerer Antwort, Verbindungsfehlern oder 5xx von Anthropic, `500` sonst.
 - Aufruf: `anthropic.beta.messages.create` mit `max_tokens` 4000,
   `output_config.effort: "low"`, serverseitigem Refusal-Fallback (Beta
   `server-side-fallback-2026-07-01`, `fallbacks: "default"`); ohne
   `temperature` und ohne `thinking` (bei Opus 5.5 immer an). Client mit
-  25 s Timeout und einem Retry.
+  25 s Timeout und ohne Retry (`maxRetries: 0`), damit die Function-Dauer reicht.
 - Auth: Das Token wird per `GET https://jjcgtizlpusshhuopftl.supabase.co/auth/v1/user`
   (mit öffentlichem Anon-Key) geprüft; gültig bei Status 200.
 - CORS: nur `https://krugundschram.org`, `https://www.krugundschram.org` und
@@ -81,7 +81,7 @@ Freigabe des Users.
   Bestehenden Stil übernehmen.
 - **Deployment:** Läuft auf Vercel (`backend/vercel.json`, die App wird als
   Serverless-Function exportiert). Änderungen an `index.js` wirken erst nach
-  einem Deploy.
+  einem Deploy. Im Vercel-Projekt Fluid Compute bzw. Function-Dauer ≥ 30 s aktivieren.
 
 ## Was hier NICHT liegt
 

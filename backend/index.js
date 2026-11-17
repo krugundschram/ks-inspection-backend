@@ -38,7 +38,7 @@ function systemPrompt(language) {
 app.disable('x-powered-by');
 
 // Austauschbar, damit Tests SDK und Token-Prüfung ersetzen können.
-app.locals.anthropic = new Anthropic({ timeout: 25000, maxRetries: 1 });
+app.locals.anthropic = new Anthropic({ timeout: 25000, maxRetries: 0 });
 app.locals.verifyUser = async (token) => {
     try {
         const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
@@ -103,6 +103,10 @@ app.post('/correct', async (req, res) => {
             .map((block) => block.text)
             .join('')
             .trim();
+
+        if (!corrected) {
+            return res.status(502).json({ error: 'Der Korrekturdienst hat keinen Text geliefert.' });
+        }
 
         res.json({ corrected });
     } catch (error) {

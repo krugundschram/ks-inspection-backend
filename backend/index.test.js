@@ -2,6 +2,8 @@ const { test, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const Anthropic = require('@anthropic-ai/sdk').default;
 const app = require('./index');
+// Vor dem Ersetzen durch den Stub festhalten, um die Client-Konfiguration zu prüfen.
+const realClient = app.locals.anthropic;
 
 let server;
 let baseURL;
@@ -99,6 +101,18 @@ test('meldet eine Ablehnung des Modells mit 422', async () => {
 test('meldet abgeschnittene Antworten mit 502', async () => {
     nextResult = () => ({ stop_reason: 'max_tokens', content: [{ type: 'text', text: 'Der Wech' }] });
     assert.equal((await correct({ text: 'Text', language: 'de' })).status, 502);
+});
+
+test('meldet eine Antwort ohne Text mit 502', async () => {
+    nextResult = () => ({ stop_reason: 'end_turn', content: [{ type: 'thinking', thinking: '' }, { type: 'text', text: '  ' }] });
+    const res = await correct({ text: 'Text', language: 'de' });
+    assert.equal(res.status, 502);
+    assert.ok((await res.json()).error);
+});
+
+test('konfiguriert den Client ohne Retries mit 25 s Timeout', () => {
+    assert.equal(realClient.maxRetries, 0);
+    assert.equal(realClient.timeout, 25000);
 });
 
 test('bildet SDK-Fehler auf 429, 502 und 500 ab', async (t) => {

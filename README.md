@@ -84,7 +84,7 @@ curl -X POST http://localhost:3000/correct \
 | `401`  | Token fehlt oder ist ungültig                                      |
 | `422`  | Das Modell hat die Anfrage abgelehnt                               |
 | `429`  | Rate-Limit bei Anthropic                                           |
-| `502`  | Antwort abgeschnitten, Anthropic nicht erreichbar oder 5xx         |
+| `502`  | Antwort abgeschnitten oder leer, Anthropic nicht erreichbar oder 5xx |
 | `500`  | Sonstiger Fehler beim Verarbeiten                                  |
 
 ## Test
@@ -101,3 +101,4 @@ die Token-Prüfung durch Stubs und machen keine echten API-Aufrufe.
 
 Der Service ist auf [Vercel](https://vercel.com/) deployt (`backend/vercel.json`).
 Der `ANTHROPIC_API_KEY` muss dort als Environment-Variable hinterlegt sein.
+Im Vercel-Projekt Fluid Compute aktivieren bzw. die Function-Dauer auf mindestens 30 s setzen (Supabase-Prüfung bis 5 s + Claude-Aufruf bis 25 s, ohne Retry).
