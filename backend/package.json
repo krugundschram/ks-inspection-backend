@@ -4,14 +4,14 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test"
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.10.0",
     "dotenv": "^16.4.7",
-    "express": "^5.1.0",
-    "openai": "^4.92.0"
+    "express": "^5.1.0"
   }
 }
